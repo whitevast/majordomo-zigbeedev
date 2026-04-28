@@ -103,6 +103,7 @@ if ($res[0]['ID']) {
         }
         if ($res[$i]['MODEL']) {
             $res[$i]['MODEL'] = str_replace('/', '-', $res[$i]['MODEL']);
+            $res[$i]['MODEL_IMAGE'] = str_replace(' ', '-', $res[$i]['MODEL']);
             $res[$i]['MODEL'] = str_replace(' ', '_', $res[$i]['MODEL']);
         }
     }
