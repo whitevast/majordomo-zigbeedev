@@ -3,7 +3,7 @@
  * ZigbeeDev
  * @package project
  * @author Wizard <sergejey@gmail.com>
- * @copyright http://majordomo.smartliving.ru/ (c)
+ * @copyright https://ru.majordomohome.com/ (c)
  * @version 0.1 (wizard, 18:09:32 [Sep 17, 2021])
  */
 //
@@ -189,7 +189,7 @@ class zigbeedev extends module
             }
         }
 
-        if ($this->view_mode=='list_unsupported') {
+        if ($this->view_mode == 'list_unsupported') {
             $this->listUnsupportedDevices($out);
         }
 
@@ -200,45 +200,46 @@ class zigbeedev extends module
 
     }
 
-    function listUnsupportedDevices(&$out) {
+    function listUnsupportedDevices(&$out)
+    {
         $devices = SQLSelect("SELECT ID, MODEL, MODEL_NAME FROM zigbeedevices ORDER BY MODEL_NAME, TITLE");
         $res_devices = array();
         $total = count($devices);
         $seen = array();
-        for($i=0;$i<$total;$i++) {
+        for ($i = 0; $i < $total; $i++) {
             $device = $devices[$i];
-            if (trim($device['MODEL'])=='' && trim($device['MODEL_NAME'])=='') continue;
-            if ($device['MODEL']!='') {
+            if (trim($device['MODEL']) == '' && trim($device['MODEL_NAME']) == '') continue;
+            if ($device['MODEL'] != '') {
                 if (isset($seen[$device['MODEL']])) continue;
                 $seen[$device['MODEL']] = 1;
             }
-            if ($device['MODEL_NAME']!='') {
+            if ($device['MODEL_NAME'] != '') {
                 if (isset($seen[$device['MODEL_NAME']])) continue;
                 $seen[$device['MODEL_NAME']] = 1;
             }
             $supported = $this->checkDeviceType($device['ID']);
             if (!$supported) {
-                $properties = SQLSelect("SELECT TITLE, VALUE, LINKED_OBJECT, LINKED_PROPERTY, LINKED_METHOD FROM zigbeeproperties WHERE DEVICE_ID=".$device['ID']);
+                $properties = SQLSelect("SELECT TITLE, VALUE, LINKED_OBJECT, LINKED_PROPERTY, LINKED_METHOD FROM zigbeeproperties WHERE DEVICE_ID=" . $device['ID']);
                 $total_p = count($properties);
-                for($ip=0;$ip<$total_p;$ip++) {
-                    if ($properties[$ip]['LINKED_OBJECT']!='') {
-                        $sdevice = SQLSelectOne("SELECT ID, TYPE FROM devices WHERE LINKED_OBJECT='".$properties[$ip]['LINKED_OBJECT']."'");
+                for ($ip = 0; $ip < $total_p; $ip++) {
+                    if ($properties[$ip]['LINKED_OBJECT'] != '') {
+                        $sdevice = SQLSelectOne("SELECT ID, TYPE FROM devices WHERE LINKED_OBJECT='" . $properties[$ip]['LINKED_OBJECT'] . "'");
                         if (isset($sdevice['TYPE'])) {
-                            $properties[$ip]['LINKED_OBJECT'].=' (device type: '.$sdevice['TYPE'].')';
+                            $properties[$ip]['LINKED_OBJECT'] .= ' (device type: ' . $sdevice['TYPE'] . ')';
                         }
                     }
-                    foreach($properties[$ip] as $k=>$v) {
-                        if ($v==="") unset($properties[$ip][$k]);
+                    foreach ($properties[$ip] as $k => $v) {
+                        if ($v === "") unset($properties[$ip][$k]);
                     }
                 }
-                $device['PROPERTIES']=$properties;
+                $device['PROPERTIES'] = $properties;
                 unset($device['ID']);
-                $res_devices[]=$device;
+                $res_devices[] = $device;
             }
 
         }
-        if (count($res_devices)>0) {
-            $out['DETAILS'] = json_encode($res_devices,JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK);
+        if (count($res_devices) > 0) {
+            $out['DETAILS'] = json_encode($res_devices, JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK);
         }
 
     }
@@ -489,7 +490,7 @@ class zigbeedev extends module
             if ($data[0] == "{")
                 $json = "{\"$property\":$data}";
             else
-                $json = json_encode(array($property => $data),JSON_NUMERIC_CHECK);
+                $json = json_encode(array($property => $data), JSON_NUMERIC_CHECK);
             $this->mqttPublish($device_rec['FULL_PATH'] . '/set', $json);
         }
     }
@@ -534,10 +535,20 @@ class zigbeedev extends module
 
     function processMessage($path, $did, $value, $hub)
     {
+
         if (preg_match('/\#$/', $path)) {
             return 0;
         }
         startMeasure('zd_processMessage');
+
+        if (preg_match('/^{/', $value)) {
+            $ar = json_decode($value, true);
+            if (preg_match('/\/([^\\/]+?)$/', $path, $m) && isset($ar[$m[1]])) {
+                $path = str_replace($m[0],'',$path);
+            }
+        } else {
+            $ar = false;
+        }
 
         $device = SQLSelectOne("SELECT * FROM zigbeedevices WHERE TITLE='" . DBSafe($did) . "'");
         if (!$device['ID']) {
@@ -559,8 +570,7 @@ class zigbeedev extends module
             SQLUpdate('zigbeedevices', $device);
         }
 
-        if (preg_match('/^{/', $value)) {
-            $ar = json_decode($value, true);
+        if (is_array($ar)) {
             if ($hub && !empty($ar['type']) && $ar['type'] == 'devices' && is_array($ar['message'])) {
                 $path = preg_replace('/bridge.+/', '', $path);
                 if ($this->config['DEBUG_MODE']) {
@@ -580,7 +590,7 @@ class zigbeedev extends module
                 $this->processListOfDevices($path, $devices);
                 return;
             }
-            if ($hub && !empty($ar['type']) && $ar['type'] == 'device_announce' && isset($ar['meta']) && is_array($ar['meta'])) {
+            if ($hub && !empty($ar['type']) && $ar['type'] == 'device_announce' && is_array($ar['meta'])) {
                 if ($ar['meta']['ieeeAddr']) {
                     $friendly_name = $ar['meta']['friendly_name'];
                     if (!$friendly_name) {
@@ -603,15 +613,11 @@ class zigbeedev extends module
                 }
             }
             $prop = SQLSelect("SELECT * FROM zigbeeproperties WHERE DEVICE_ID=" . $device['ID']);
-            foreach($prop as $property){
+            foreach ($prop as $property) {
                 $properties[$property['TITLE']] = $property;
             }
-            if(preg_match('/availability/', $path) && isset($ar['state'])){
-                $ar['availability'] = $ar['state'];
-                unset($ar['state']);
-            }
             foreach ($ar as $k => $v) {
-                if (is_array($v)) $v = json_encode($v,JSON_NUMERIC_CHECK);
+                if (is_array($v)) $v = json_encode($v, JSON_NUMERIC_CHECK);
                 if ($k == 'action') {
                     $this->processData($device, 'action:' . $v, date('Y-m-d H:i:s'), $properties);
                 }
@@ -643,11 +649,11 @@ class zigbeedev extends module
                 $rec['TITLE'] = $rec['IEEEADDR'];
             }
             $rec['FULL_PATH'] = $device_data['path'];
-            $rec['MANUFACTURER_ID'] = '' . (isset($device_data['manufacturerID']) ? $device_data['manufacturerID'] : (isset($device_data['manufacturer']) ? $device_data['manufacturer'] : ''));
-            $rec['MODEL'] = '' . (isset($device_data['model']) ? $device_data['model'] : (isset($device_data['definition']['model']) ? $device_data['definition']['model'] : ''));
-            $rec['MODEL_NAME'] = '' . (isset($device_data['modelID']) ? $device_data['modelID'] : (isset($device_data['model_id']) ? $device_data['model_id'] : ''));
-            $rec['MODEL_DESCRIPTION'] = '' . (isset($device_data['description']) ? $device_data['description'] : (isset($device_data['definition']['description']) ? $device_data['definition']['description'] : ''));
-            $rec['VENDOR'] = '' . (isset($device_data['vendor']) ? $device_data['vendor'] : (isset($device_data['definition']['vendor']) ? $device_data['definition']['vendor'] : ''));
+            $rec['MANUFACTURER_ID'] = '' . (isset($device_data['manufacturerID']) ? $device_data['manufacturerID'] : $device_data['manufacturer']);
+            $rec['MODEL'] = '' . (isset($device_data['model']) ? $device_data['model'] : $device_data['definition']['model']);
+            $rec['MODEL_NAME'] = '' . (isset($device_data['modelID']) ? $device_data['modelID'] : $device_data['model_id']);
+            $rec['MODEL_DESCRIPTION'] = '' . (isset($device_data['description']) ? $device_data['description'] : $device_data['definition']['description']);
+            $rec['VENDOR'] = '' . (isset($device_data['vendor']) ? $device_data['vendor'] : $device_data['definition']['vendor']);
             if (!$rec['DESCRIPTION'] || preg_match('/^\-/', trim($rec['DESCRIPTION']))) {
                 $rec['DESCRIPTION'] = $rec['MODEL_DESCRIPTION'] . ' - ' . $rec['TITLE'];
             }
@@ -667,13 +673,13 @@ class zigbeedev extends module
         endMeasure('zd_processListOfDevices');
     }
 
-    function processData(&$device, $prop, $value, $properties='')
+    function processData(&$device, $prop, $value, $properties = '')
     {
         startMeasure('zd_processData');
-        if($properties != ''){
-			if(isset($properties['TITLE']) && $properties['TITLE'] == $prop) $property = $properties;
-			else $property = $properties[$prop];
-		}
+        if ($properties != '') {
+            if (isset($properties['TITLE']) && $properties['TITLE'] == $prop) $property = $properties;
+            else $property = $properties[$prop];
+        }
         if (!isset($property['ID'])) {
             $property = array('TITLE' => $prop, 'DEVICE_ID' => $device['ID']);
         }
@@ -689,9 +695,12 @@ class zigbeedev extends module
         $property['VALUE'] = $value;
         $property['UPDATED'] = date('Y-m-d H:i:s');
         if (!isset($property['ID'])) {
+            if ($property['DEVICE_ID'] == '28') {
+                DebMes(json_encode($property), 'zigbee_' . $property['ID'] . "_inserted");
+            }
             $property['ID'] = SQLInsert('zigbeeproperties', $property);
         } else {
-            if($property['PROCESS_TYPE'] == 1 || ($property['PROCESS_TYPE'] == 0 && $value != $old_value)){
+            if ($property['PROCESS_TYPE'] == 1 || ($property['PROCESS_TYPE'] == 0 && $value != $old_value)) {
                 SQLUpdate('zigbeeproperties', $property);
             }
         }
@@ -709,7 +718,7 @@ class zigbeedev extends module
 
             if ($property['VALUE'] != $old_value || $prop == 'action' || $property['PROCESS_TYPE'] == 1) {
                 if ($property['LINKED_PROPERTY']) {
-                    setGlobal($property['LINKED_OBJECT'] . '.' . $property['LINKED_PROPERTY'], $new_value, array($this->name => '0'));
+                    setGlobal($property['LINKED_OBJECT'] . '.' . $property['LINKED_PROPERTY'], $new_value, array($this->name => '0'), json_encode($_REQUEST));
                 }
                 if ($property['LINKED_METHOD']) {
                     callMethod($property['LINKED_OBJECT'] . '.' . $property['LINKED_METHOD'], array(
@@ -718,7 +727,7 @@ class zigbeedev extends module
                 }
             }
         }
-        if ($prop == 'battery'){
+        if ($prop == 'battery') {
             if ($value == '') $value = 0;
             if ($device['BATTERY_LEVEL'] != $value) {
                 $device['IS_BATTERY'] = 1;
@@ -739,7 +748,7 @@ class zigbeedev extends module
             $data['r'] = $retain;
         }
         //DebMes("Publishing to $topic: $value",'zigbeedev_publish');
-        addToOperationsQueue('zigbeedev_queue', $topic, json_encode($data,JSON_NUMERIC_CHECK), true);
+        addToOperationsQueue('zigbeedev_queue', $topic, json_encode($data, JSON_NUMERIC_CHECK), true);
         return 1;
 
         /*
