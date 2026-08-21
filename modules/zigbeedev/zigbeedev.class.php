@@ -695,9 +695,6 @@ class zigbeedev extends module
         $property['VALUE'] = $value;
         $property['UPDATED'] = date('Y-m-d H:i:s');
         if (!isset($property['ID'])) {
-            if ($property['DEVICE_ID'] == '28') {
-                DebMes(json_encode($property), 'zigbee_' . $property['ID'] . "_inserted");
-            }
             $property['ID'] = SQLInsert('zigbeeproperties', $property);
         } else {
             if ($property['PROCESS_TYPE'] == 1 || ($property['PROCESS_TYPE'] == 0 && $value != $old_value)) {
@@ -750,39 +747,6 @@ class zigbeedev extends module
         //DebMes("Publishing to $topic: $value",'zigbeedev_publish');
         addToOperationsQueue('zigbeedev_queue', $topic, json_encode($data, JSON_NUMERIC_CHECK), true);
         return 1;
-
-        /*
-        include_once(ROOT . "3rdparty/phpmqtt/phpMQTT.php");
-        if ($this->config['MQTT_CLIENT']) {//
-            $client_name = $this->config['MQTT_CLIENT'];
-        } else {
-            $client_name = "MajorDoMo MQTT";
-        }
-
-        if ($this->config['MQTT_AUTH']) {
-            $username = $this->config['MQTT_USERNAME'];
-            $password = $this->config['MQTT_PASSWORD'];
-        }
-        if ($this->config['MQTT_HOST']) {
-            $host = $this->config['MQTT_HOST'];
-        } else {
-            $host = 'localhost';
-        }
-        if ($this->config['MQTT_PORT']) {
-            $port = $this->config['MQTT_PORT'];
-        } else {
-            $port = 1883;
-        }
-
-        $mqtt_client = new Bluerhinos\phpMQTT($host, $port, $client_name . ' Client');
-        if (!$mqtt_client->connect(true, NULL, $username, $password)) {
-            return 0;
-        }
-
-        $mqtt_client->publish($topic, $value, $qos, $retain);
-
-        $mqtt_client->close();
-        */
     }
 
     function processCycle()
